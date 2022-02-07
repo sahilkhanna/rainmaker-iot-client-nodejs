@@ -1,0 +1,27 @@
+{
+  "name": "RainmakerClient",
+  "version": "0.0.1",
+  "description": "ESP Rainmaker Client using Swagger",
+  "main": "index.js",
+  "homepage": "https://sahilkhanna.org",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sahilkhanna"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "swagger-client": "^3.18.4"
+  },
+  "keywords": [
+    "rainmaker",
+    "iot",
+    "Swagger",
+    "OAS",
+    "esp"
+  ],
+  "author": "Sahil Khanna",
+  "license": "ISC"
+}
