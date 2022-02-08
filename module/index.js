@@ -74,10 +74,11 @@ class RainMaker {
         node_id: node,
         param_name: param,
         type: "float",
+        aggregate: "raw",
         start_time: startTime,
         end_time: endTime,
         start_id: next_id,
-        num_intervals: interval ? interval : 200,
+        num_records: interval ? interval : 200,
       });
       return { status: response.status, result: response.body };
     } catch (error) {

@@ -2,17 +2,21 @@
 
 import chalk from "chalk";
 import inquirer from "inquirer";
-import gradient from "gradient-string";
-import chalkAnimation from "chalk-animation";
-import figlet from "figlet";
+import DatePrompt from "inquirer-date-prompt";
+inquirer.registerPrompt("date", DatePrompt);
+// import gradient from "gradient-string";
+// import chalkAnimation from "chalk-animation";
+// import figlet from "figlet";
 import { createSpinner } from "nanospinner";
 import { RainMaker } from "./module/index.js";
 import fs from "fs";
 import * as json2csv from "json2csv";
+// import { dir } from "console";
 const SUCCESSRESP = 200;
-const sleep = (ms = 2000) => new Promise((r) => setTimeout(r, ms));
-let username = "";
-let password = "";
+const { cred } = JSON.parse(fs.readFileSync("./cred.json"));
+let username = cred.username;
+let password = cred.password;
+
 let RMaker = new RainMaker("", "");
 
 async function askCredentials() {
@@ -91,38 +95,76 @@ async function getTsData(spinner) {
         name: "param_name",
         message: "Type param name",
       },
+      {
+        type: "date",
+        name: "start_time",
+        message: "Choose Start Time: ",
+        prefix: " ⏰ ",
+        filter: (d) => Math.floor(d.getTime() / 1000),
+        validate: (t) =>
+          t * 1000 < Date.now() + 86400000 || "Cannot get future time",
+        transformer: (s) => chalk.bold.red(s),
+        locale: "en-AU",
+        clearable: true,
+      },
+      {
+        type: "date",
+        name: "end_time",
+        message: "Choose End Time: ",
+        prefix: " ⏰ ",
+        filter: (d) => Math.floor(d.getTime() / 1000),
+        validate: (t) =>
+          t * 1000 < Date.now() + 86400000 || "Cannot get future time",
+        transformer: (s) => chalk.bold.red(s),
+        locale: "en-AU",
+        clearable: true,
+      },
     ]);
+    console.log(answers);
     let ts_vals = [];
     let num_records = 200;
     let ts_data;
     let next_id;
     let countout = 0;
-    const MAX_SAMPLES = 1;
+    const MAX_SAMPLES = 30;
+    spinner.start();
+    spinner.update({ text: "Acquiring Samples..." });
     while (num_records == 200 && countout < MAX_SAMPLES) {
       ts_data = await RMaker.getTimeSeriesData(
         answers.node,
         answers.param_name,
-        1643912216,
-        1644203780,
+        answers.start_time,
+        answers.end_time,
         next_id,
         200
       );
       num_records = ts_data.result.ts_data[0].params[0].num_records;
       next_id = ts_data.result.ts_data[0].next_id;
       ts_vals = [...ts_vals, ...ts_data.result.ts_data[0].params[0].values];
-      console.log(ts_data.result.ts_data[0].params[0].values[num_records - 1]);
-      console.log("Length of Data: " + ts_vals.length);
+      spinner.update({
+        text: "Acquiring Samples... Data Points acquired: " + ts_vals.length,
+      });
       countout++;
     }
     const fields = Object.keys(ts_vals[0]);
     const csv = new json2csv.Parser({ fields });
-    fs.writeFile("data.csv", csv.parse(ts_vals), (err) => {
+    const csv_f_name =
+      "data/" +
+      answers.node +
+      "_" +
+      answers.param_name +
+      answers.start_time +
+      "-" +
+      answers.end_time +
+      ".csv";
+    fs.writeFile(csv_f_name, csv.parse(ts_vals), (err) => {
       if (err) {
+        spinner.stop();
         console.error(err);
         throw err;
       }
     });
-    return ts_data;
+    return { status: 200, result: ts_vals };
   } else {
     return list;
   }
