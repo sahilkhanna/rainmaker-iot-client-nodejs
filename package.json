@@ -19,6 +19,8 @@
     "figlet": "^1.5.2",
     "gradient-string": "^2.0.0",
     "inquirer": "^8.2.0",
+    "inquirer-date-prompt": "^2.0.1",
+    "json2csv": "^5.0.6",
     "nanospinner": "^1.0.0"
   }
 }
