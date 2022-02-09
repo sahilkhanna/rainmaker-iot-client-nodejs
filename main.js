@@ -8,7 +8,8 @@ inquirer.registerPrompt("date", DatePrompt);
 // import chalkAnimation from "chalk-animation";
 // import figlet from "figlet";
 import { createSpinner } from "nanospinner";
-import { RainMaker } from "./module/index.js";
+// import { RainMaker } from "./module/index.js";
+import RainMaker from "rainmaker-client";
 import fs from "fs";
 import * as json2csv from "json2csv";
 // import { dir } from "console";
@@ -17,7 +18,7 @@ const { cred } = JSON.parse(fs.readFileSync("./cred.json"));
 let username = cred.username;
 let password = cred.password;
 
-let RMaker = new RainMaker("", "");
+let RMaker = new RainMaker(username, password);
 
 async function askCredentials() {
   let answers = await inquirer.prompt([
@@ -37,7 +38,7 @@ async function askCredentials() {
 }
 
 async function loginResult(isCorrect, spinner) {
-  if (isCorrect === true) {
+  if (isCorrect.status === SUCCESSRESP) {
     spinner.success({ text: `Successfuly Logged in as ${username}` });
     return true;
   } else {
@@ -170,6 +171,94 @@ async function getTsData(spinner) {
   }
 }
 
+async function getNodeParams(spinner) {
+  const list = await getNodesList();
+  spinner.stop();
+  if (list.status === 200) {
+    const answers = await inquirer.prompt([
+      {
+        type: "list",
+        name: "node",
+        message: "Select node:",
+        choices: list.result.nodes,
+      },
+    ]);
+    spinner.start();
+    spinner.update({ text: "Acquiring All Parameters Data..." });
+    return await RMaker.getAllNodeParams(answers.node);
+  } else {
+    return list;
+  }
+}
+
+async function setNodeParamValue(spinner) {
+  const list = await getNodesList();
+  spinner.stop();
+  if (list.status === 200) {
+    let answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "node",
+        message: "Select node:",
+        choices: list.result.nodes,
+      },
+    ]);
+    spinner.start();
+    spinner.update({ text: "Acquiring All Parameters Data..." });
+    let node = answer.node;
+    const paramData = await RMaker.getAllNodeParams(node);
+    spinner.stop();
+    answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "device",
+        message: "Choose the Following Device?",
+        choices: Object.keys(paramData.result),
+      },
+    ]);
+    let device = answer.device;
+    answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "param",
+        message: "Choose the Following Param?",
+        choices: Object.keys(paramData.result[answer.device]),
+      },
+    ]);
+    let param = answer.param;
+    const listTypes = [
+      { msg: "String", type: "input" },
+      { msg: "Boolean", type: "confirm" },
+      { msg: "Integer", type: "number" },
+      { msg: "Float", type: "number" },
+    ];
+    answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "type",
+        message: "Choose Value Type",
+        choices: listTypes.map((list) => {
+          return list.msg;
+        }),
+      },
+    ]);
+    const type = listTypes.filter((type) => type.msg === answer.type);
+    answer = await inquirer.prompt([
+      {
+        type: type[0].type,
+        name: "value",
+        message: "Enter Value for " + device + "." + param + "= ",
+      },
+    ]);
+    spinner.start();
+    spinner.update({
+      text: "Setting " + device + "." + param + "=" + answer.value + "...",
+    });
+    return await RMaker.setNodeParamValue(node, device, param, answer.value);
+  } else {
+    return list;
+  }
+}
 async function getApiClient() {
   return RMaker.getApiFunctions();
 }
@@ -182,6 +271,8 @@ async function chooseReqs(isAuth) {
     { msg: "Get Nodes List with Details", func: getNodesListDetailed },
     { msg: "Get time Series Data", func: getTsData },
     { msg: "Get api client", func: getApiClient },
+    { msg: "Get Node Params", func: getNodeParams },
+    { msg: "Set a Node Param's value", func: setNodeParamValue },
   ];
   let answers = await inquirer.prompt([
     {
@@ -198,6 +289,6 @@ async function chooseReqs(isAuth) {
   const spinner = createSpinner("Performing Request...").start();
   return reqResult(await doReq(spinner), spinner);
 }
-await askCredentials();
+// await askCredentials();
 let isAuth = await getAuth(username, password);
 await chooseReqs(isAuth);
