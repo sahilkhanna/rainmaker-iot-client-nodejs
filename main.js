@@ -8,13 +8,11 @@ inquirer.registerPrompt("date", DatePrompt);
 // import chalkAnimation from "chalk-animation";
 // import figlet from "figlet";
 import { createSpinner } from "nanospinner";
-// import { RainMaker } from "./module/index.js";
 import RainMaker from "rainmaker-client";
 import fs from "fs";
 import * as json2csv from "json2csv";
-// import { dir } from "console";
-const SUCCESSRESP = 200;
-const { cred } = JSON.parse(fs.readFileSync("./cred.json"));
+import { isSuccess, saveToFile, readFromFile } from "./util/helper.mjs";
+const { cred } = JSON.parse(readFromFile("./cred.json"));
 let username = cred.username;
 let password = cred.password;
 
@@ -38,7 +36,7 @@ async function askCredentials() {
 }
 
 async function loginResult(isCorrect, spinner) {
-  if (isCorrect.status === SUCCESSRESP) {
+  if (isSuccess(isCorrect.status)) {
     spinner.success({ text: `Successfuly Logged in as ${username}` });
     return true;
   } else {
@@ -57,7 +55,7 @@ async function getAuth(username, password) {
 }
 
 async function reqResult(response, spinner) {
-  if (response.status === SUCCESSRESP) {
+  if (isSuccess(response.status)) {
     spinner.success({
       text: `Request successful with response`,
     });
@@ -84,18 +82,38 @@ async function getTsData(spinner) {
   const list = await getNodesList();
   spinner.stop();
   if (list.status === 200) {
-    let answers = await inquirer.prompt([
+    let answer = await inquirer.prompt([
       {
         type: "list",
         name: "node",
         message: "Select node:",
         choices: list.result.nodes,
       },
+    ]);
+    spinner.start();
+    spinner.update({ text: "Acquiring All Parameters Data..." });
+    let node = answer.node;
+    const paramData = await RMaker.getAllNodeParams(node);
+    spinner.stop();
+    answer = await inquirer.prompt([
       {
-        type: "input",
-        name: "param_name",
-        message: "Type param name",
+        type: "list",
+        name: "device",
+        message: "Choose the Following Device?",
+        choices: Object.keys(paramData.result),
       },
+    ]);
+    let device = answer.device;
+    answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "param",
+        message: "Choose the Following Param?",
+        choices: Object.keys(paramData.result[answer.device]),
+      },
+    ]);
+    let param = answer.param;
+    let answers = await inquirer.prompt([
       {
         type: "date",
         name: "start_time",
@@ -132,8 +150,8 @@ async function getTsData(spinner) {
     spinner.update({ text: "Acquiring Samples..." });
     while (num_records == 200 && countout < MAX_SAMPLES) {
       ts_data = await RMaker.getTimeSeriesData(
-        answers.node,
-        answers.param_name,
+        node,
+        device + "." + param,
         answers.start_time,
         answers.end_time,
         next_id,
@@ -151,23 +169,20 @@ async function getTsData(spinner) {
     const csv = new json2csv.Parser({ fields });
     const csv_f_name =
       "data/" +
-      answers.node +
+      node +
       "_" +
-      answers.param_name +
+      device +
+      "." +
+      param +
+      "_" +
       answers.start_time +
       "-" +
       answers.end_time +
       ".csv";
-    fs.writeFile(csv_f_name, csv.parse(ts_vals), (err) => {
-      if (err) {
-        spinner.stop();
-        console.error(err);
-        throw err;
-      }
-    });
+    saveToFile(csv_f_name, csv.parse(ts_vals));
     return { status: 200, result: ts_vals };
   } else {
-    return list;
+    return nodes;
   }
 }
 
@@ -231,6 +246,7 @@ async function setNodeParamValue(spinner) {
       { msg: "Boolean", type: "confirm" },
       { msg: "Integer", type: "number" },
       { msg: "Float", type: "number" },
+      { msg: "Array", type: "input" },
     ];
     answer = await inquirer.prompt([
       {
@@ -242,12 +258,18 @@ async function setNodeParamValue(spinner) {
         }),
       },
     ]);
-    const type = listTypes.filter((type) => type.msg === answer.type);
+    const inputType = listTypes.filter((type) => type.msg === answer.type);
     answer = await inquirer.prompt([
       {
-        type: type[0].type,
+        type: inputType[0].type,
         name: "value",
         message: "Enter Value for " + device + "." + param + "= ",
+        filter(val) {
+          if (inputType[0].msg === "Array") {
+            return JSON.parse(val);
+          }
+          return val;
+        },
       },
     ]);
     spinner.start();
@@ -289,6 +311,26 @@ async function chooseReqs(isAuth) {
   const spinner = createSpinner("Performing Request...").start();
   return reqResult(await doReq(spinner), spinner);
 }
-// await askCredentials();
-let isAuth = await getAuth(username, password);
-await chooseReqs(isAuth);
+
+async function main() {
+  // await askCredentials();
+  let isAuth = await getAuth(username, password);
+  await chooseReqs(isAuth);
+}
+
+async function test() {
+  const answer = await inquirer.prompt([
+    {
+      type: "input",
+      name: "value",
+      message: "Enter array = ",
+      filter(val) {
+        console.log(val);
+        return JSON.parse(val);
+      },
+    },
+  ]);
+  console.log(answer);
+}
+// test();
+main();
