@@ -73,9 +73,31 @@ async function reqResult(response, spinner) {
 async function getNodesList() {
   return await RMaker.getUserNodes(false);
 }
-
 async function getNodesListDetailed() {
   return await RMaker.getUserNodes(true);
+}
+async function getUserGroupList() {
+  return await RMaker.getUserGroupDetails(true);
+}
+async function getUserGroupDetails(spinner) {
+  let list = await RMaker.getUserGroupDetails(true);
+  spinner.stop();
+  console.log(list.result);
+  if (list.status === 200) {
+    const answers = await inquirer.prompt([
+      {
+        type: "list",
+        name: "groupID",
+        message: "Select Group:",
+        choices: list.result.groups.group_id,
+      },
+    ]);
+    spinner.start();
+    spinner.update({ text: "Acquiring All Parameters Data..." });
+    return await RMaker.getUserGroupDetails(true, answers.groupID, true);
+  } else {
+    return list;
+  }
 }
 
 async function getTsData(spinner) {
@@ -290,6 +312,8 @@ async function chooseReqs(isAuth) {
   }
   const requests = [
     { msg: "Get Nodes List", func: getNodesList },
+    { msg: "Get User Groups List", func: getUserGroupList },
+    { msg: "Get User Group Details", func: getUserGroupDetails },
     { msg: "Get Nodes List with Details", func: getNodesListDetailed },
     { msg: "Get time Series Data", func: getTsData },
     { msg: "Get api client", func: getApiClient },
