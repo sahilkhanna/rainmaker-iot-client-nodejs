@@ -82,14 +82,16 @@ async function getUserGroupList() {
 async function getUserGroupDetails(spinner) {
   let list = await RMaker.getUserGroupDetails(true);
   spinner.stop();
-  console.log(list.result);
+  let groupIds = list.result.groups.map((grp) => {
+    return { name: grp.group_name, value: grp.group_id };
+  });
   if (list.status === 200) {
     const answers = await inquirer.prompt([
       {
         type: "list",
         name: "groupID",
         message: "Select Group:",
-        choices: list.result.groups.group_id,
+        choices: groupIds,
       },
     ]);
     spinner.start();
@@ -311,27 +313,24 @@ async function chooseReqs(isAuth) {
     throw new Error("Not Authenticated");
   }
   const requests = [
-    { msg: "Get Nodes List", func: getNodesList },
-    { msg: "Get User Groups List", func: getUserGroupList },
-    { msg: "Get User Group Details", func: getUserGroupDetails },
-    { msg: "Get Nodes List with Details", func: getNodesListDetailed },
-    { msg: "Get time Series Data", func: getTsData },
-    { msg: "Get api client", func: getApiClient },
-    { msg: "Get Node Params", func: getNodeParams },
-    { msg: "Set a Node Param's value", func: setNodeParamValue },
+    { name: "Get Nodes List", value: getNodesList },
+    { name: "Get User Groups List", value: getUserGroupList },
+    { name: "Get User Group Details", value: getUserGroupDetails },
+    { name: "Get Nodes List with Details", value: getNodesListDetailed },
+    { name: "Get time Series Data", value: getTsData },
+    { name: "Get api client", value: getApiClient },
+    { name: "Get Node Params", value: getNodeParams },
+    { name: "Set a Node Param's value", value: setNodeParamValue },
   ];
   let answers = await inquirer.prompt([
     {
       type: "list",
       name: "req",
       message: "Choose the Following Requests?",
-      choices: requests.map((req) => {
-        return req.msg;
-      }),
+      choices: requests,
     },
   ]);
-  const req = requests.filter((req) => req.msg === answers.req);
-  const doReq = req[0].func;
+  const doReq = answers.req;
   const spinner = createSpinner("Performing Request...").start();
   return reqResult(await doReq(spinner), spinner);
 }
