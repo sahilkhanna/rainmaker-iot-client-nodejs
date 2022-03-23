@@ -69,7 +69,9 @@ async function reqResult(response, spinner) {
     return false;
   }
 }
-
+async function extendUserSession() {
+  return await RMaker.authenticate(true);
+}
 async function getNodesList() {
   return await RMaker.getUserNodes(false);
 }
@@ -97,6 +99,79 @@ async function getUserGroupDetails(spinner) {
     spinner.start();
     spinner.update({ text: "Acquiring All Parameters Data..." });
     return await RMaker.getUserGroupDetails(true, answers.groupID, true);
+  } else {
+    return list;
+  }
+}
+async function deleteUserGroup(spinner) {
+  let list = await RMaker.getUserGroupDetails(true);
+  spinner.stop();
+  let groupIds = list.result.groups.map((grp) => {
+    return { name: grp.group_name, value: grp.group_id };
+  });
+  if (list.status === 200) {
+    const answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "groupID",
+        message: "Select Group:",
+        choices: groupIds,
+      },
+    ]);
+    const confirm = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "val",
+        message: "Are you sure you want to delete " + answer.groupID + "?",
+        choices: groupIds,
+      },
+    ]);
+    if (confirm.val) {
+      spinner.start();
+      spinner.update({ text: "Acquiring All Parameters Data..." });
+      return await RMaker.deleteUserGroup(answer.groupID);
+    } else {
+      return;
+    }
+  } else {
+    return list;
+  }
+}
+async function AddUserGroup(spinner) {
+  let list = await RMaker.getUserNodes(false);
+  spinner.stop();
+  if (list.status === 200) {
+    const groupName = await inquirer.prompt([
+      {
+        type: "input",
+        name: "val",
+        message: "Enter Group Name:",
+      },
+    ]);
+
+    const node = await inquirer.prompt([
+      {
+        type: "checkbox",
+        name: "val",
+        message: "Choose Nodes:",
+        choices: list.result.nodes,
+      },
+    ]);
+
+    const description = await inquirer.prompt([
+      {
+        type: "input",
+        name: "val",
+        message: "Enter Group Description:",
+      },
+    ]);
+    spinner.start();
+    spinner.update({ text: "Acquiring All Parameters Data..." });
+    return await RMaker.createUserGroup(
+      groupName.val,
+      node.val,
+      description.val
+    );
   } else {
     return list;
   }
@@ -316,11 +391,14 @@ async function chooseReqs(isAuth) {
     { name: "Get Nodes List", value: getNodesList },
     { name: "Get User Groups List", value: getUserGroupList },
     { name: "Get User Group Details", value: getUserGroupDetails },
+    { name: "Add User Group", value: AddUserGroup },
+    { name: "Delete User Group", value: deleteUserGroup },
     { name: "Get Nodes List with Details", value: getNodesListDetailed },
     { name: "Get time Series Data", value: getTsData },
     { name: "Get api client", value: getApiClient },
     { name: "Get Node Params", value: getNodeParams },
-    { name: "Set a Node Param's value", value: setNodeParamValue },
+    { name: "Set a Node Param value", value: setNodeParamValue },
+    { name: "Extend Session", value: extendUserSession },
   ];
   let answers = await inquirer.prompt([
     {
@@ -338,6 +416,7 @@ async function chooseReqs(isAuth) {
 async function main() {
   // await askCredentials();
   let isAuth = await getAuth(username, password);
+  // console.log(RMaker.refreshtoken);
   await chooseReqs(isAuth);
 }
 
